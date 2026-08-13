@@ -2232,6 +2232,12 @@ function recordTransientDrop(url) {
 function compareWispServers(a, b) {
 	const primary = getPrimaryWispUrl();
 	if (a.reachable !== b.reachable) return a.reachable ? -1 : 1;
+	// The configured primary (21baseballacademy by default) always wins among
+	// servers with the same reachability, so the app keeps using it whenever it
+	// is available and only falls back to another server when it is down.
+	const aIsPrimary = a.url === primary;
+	const bIsPrimary = b.url === primary;
+	if (aIsPrimary !== bIsPrimary) return aIsPrimary ? -1 : 1;
 	const failureDelta = getWispFailureCount(a.url) - getWispFailureCount(b.url);
 	if (failureDelta) return failureDelta;
 	const successDelta = (b.successes || 0) - (a.successes || 0);
@@ -2239,9 +2245,6 @@ function compareWispServers(a, b) {
 	const latencyDelta = (a.latency || Infinity) - (b.latency || Infinity);
 	if (latencyDelta) return latencyDelta;
 	if (a.pending !== b.pending) return a.pending ? -1 : 1;
-	const aIsPrimary = a.url === primary;
-	const bIsPrimary = b.url === primary;
-	if (aIsPrimary !== bIsPrimary) return aIsPrimary ? -1 : 1;
 	return (a.index || 0) - (b.index || 0);
 }
 

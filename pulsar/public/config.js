@@ -1,11 +1,11 @@
 window.__PULSAR_CONFIG__ = {
-    wispUrl: "wss://schoolrocks.lwledu.hk/w/",
+    wispUrl: "wss://21baseballacademy.com/ws/",
     wispUrls: [
 
+        "wss://21baseballacademy.com/ws/",
         "wss://schoolhelp.tozsugianto.com/w",
         "wss://schoolrocks.lwledu.hk/w/",
 
-        "wss://21baseballacademy.com/ws/",
         "wss://wisp.rhw.one/wisp/",
         "wss://wisp.mercurywork.shop/",
         "wss://anura.pro/",
