@@ -71,6 +71,33 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
   const path = url.pathname.replace(/\/+$/, "");
+
+  if (/.html$/i.test(path)) {
+    // jsDelivr serves repository .html as text/plain with nosniff, which would
+    // render as raw text in frames. Re-serve it as a real HTML document so
+    // relative URLs, same-origin access, and nested document loads keep a
+    // normal document URL.
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(event.request);
+        const headers = new Headers(response.headers);
+        headers.set("content-type", "text/html; charset=utf-8");
+        headers.delete("x-content-type-options");
+        return new Response(await response.arrayBuffer(), {
+          status: response.status,
+          statusText: response.statusText,
+          headers,
+        });
+      } catch (error) {
+        return new Response(
+          "Failed to load " + url.href + ": " + (error?.message || error),
+          { status: 502, headers: { "content-type": "text/html; charset=utf-8" } }
+        );
+      }
+    })());
+    return;
+  }
+
   if (path.endsWith("/api/ai")) {
     event.respondWith(proxyAi(event.request));
     return;

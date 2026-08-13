@@ -636,6 +636,28 @@ async function handleRequest(event) {
 	return injectPageScripts(response, includeAdblock, effectivePrivacy);
 }
 
+// jsDelivr serves repository .html as text/plain with nosniff. The shell
+// responses this worker hands out must be real HTML documents, so re-serve
+// same-origin .html responses with an HTML content type.
+function serveShellHtml(request, response) {
+	if (!response || !response.ok) return response;
+	let requestUrl;
+	try {
+		requestUrl = new URL(request.url);
+	} catch (_) {
+		requestUrl = null;
+	}
+	if (!requestUrl || !/\.html$/i.test(requestUrl.pathname)) return response;
+	const headers = new Headers(response.headers);
+	headers.set("content-type", "text/html; charset=utf-8");
+	headers.delete("x-content-type-options");
+	return new Response(response.body, {
+		status: response.status,
+		statusText: response.statusText,
+		headers,
+	});
+}
+
 async function refreshShellCache(request) {
 	try {
 		const response = await fetch(request);
@@ -651,14 +673,14 @@ async function cacheFirstShell(request) {
 	const cached = await cache.match(request, { ignoreVary: true });
 	if (cached) {
 		refreshShellCache(request);
-		return cached;
+		return serveShellHtml(request, cached);
 	}
 	const response = await fetch(request);
 	if (response && response.ok) {
 		const copy = response.clone();
 		cache.put(request, copy).catch(() => {});
 	}
-	return response;
+	return serveShellHtml(request, response);
 }
 
 async function networkFirstShell(request) {
@@ -669,10 +691,10 @@ async function networkFirstShell(request) {
 			const copy = response.clone();
 			cache.put(request, copy).catch(() => {});
 		}
-		return response;
+		return serveShellHtml(request, response);
 	} catch (_) {
 		const cached = await cache.match(request, { ignoreVary: true });
-		return cached || Response.error();
+		return cached ? serveShellHtml(request, cached) : Response.error();
 	}
 }
 

@@ -269,104 +269,19 @@ rootDocument = rootDocument.replace("</head>", `${rootServiceWorkerBoot}${proxyB
 writeFileSync(join(distDir, "index.html"), rootDocument);
 writeFileSync(join(distDir, "sw.js"), standaloneServiceWorker);
 
-// Build a copyable redistribution entrypoint. Statically also serves GitHub
-// HTML as text/plain, so fetch those documents as text, normalize their
-// base URL, and parse them through a real same-origin document.
+// Build a copyable redistribution entrypoint. The SVG entrypoints and service
+// worker (written below) keep everything on jsDelivr; the redist wrappers just
+// iframe the jsDelivr SVG entrypoint.
 const redistDir = join(packageDir, "redist");
 mkdirSync(redistDir, { recursive: true });
-const redistCdnBase = "https://cdn.statically.io/gh/shayderrr/eclipse/main/";
-const redistPulsarUrl = `${redistCdnBase}pulsar/public/index.html`;
-const redistLoader = `<script>
-(() => {
-  const CDN_ORIGIN = ${JSON.stringify(new URL(redistCdnBase).origin)};
-  const nativeFetch = window.fetch.bind(window);
-  const toUrl = (input) => {
-    try { return new URL(typeof input === "string" ? input : input.url, document.baseURI); }
-    catch (_) { return null; }
-  };
-  const isCdnHtml = (input) => {
-    const url = toUrl(input);
-    return url?.origin === CDN_ORIGIN && /\\.html$/i.test(url.pathname);
-  };
-
-  // Normalize fetch responses for code that requests a Statically HTML file.
-  // Browser navigations are handled by the real-document loader below.
-  window.fetch = async (input, init) => {
-    const response = await nativeFetch(input, init);
-    if (!isCdnHtml(input)) return response;
-    const headers = new Headers(response.headers);
-    headers.set("content-type", "text/html; charset=utf-8");
-    return new Response(await response.arrayBuffer(), {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
-    });
-  };
-
-  const PULSAR_URL = ${JSON.stringify(redistPulsarUrl)};
-  const injectCdnBase = (html) => {
-    const baseHref = new URL("./", PULSAR_URL).href;
-    const baseTag = '<base href="' + baseHref + '">';
-    if (/<base\\b[^>]*>/i.test(html)) return html.replace(/<base\\b[^>]*>/i, baseTag);
-    if (/<head\\b[^>]*>/i.test(html)) return html.replace(/<head\\b[^>]*>/i, (head) => head + baseTag);
-    return baseTag + html;
-  };
-
-  // A real same-origin document URL avoids an opaque iframe URL and lets the parent
-  // Eclipse shell communicate with the Pulsar controls after the document is
-  // fetched from Statically and parsed.
-  if (new URLSearchParams(location.search).has("eclipse-cdn-pulsar")) {
-    document.documentElement.style.visibility = "hidden";
-    nativeFetch(PULSAR_URL, { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Statically returned " + response.status);
-        document.open();
-        document.write(injectCdnBase(await response.text()));
-        document.close();
-      })
-      .catch((error) => {
-        document.documentElement.style.visibility = "visible";
-        document.body.textContent = "Failed to load Pulsar from Statically: " + String(error?.message || error);
-      });
-  }
-
-  window.__redistLoadCdnPage = (frame) => {
-    const pageUrl = new URL(location.pathname + "?eclipse-cdn-pulsar=1", location.href);
-    frame.src = pageUrl.href;
-  };
-})();
-</script>\n`;
-let redistDocument = read("index.html");
-redistDocument = replaceOnce(
-	redistDocument,
-	"<head>",
-	`<head>\n  <base href="${redistCdnBase}">\n  ${redistLoader}`,
-	"redistribution base URL"
-);
-redistDocument = replaceOnce(
-	redistDocument,
-	'<iframe id="proxy-frame" src="./pulsar/public/index.html" allow="fullscreen"></iframe>',
-	'<iframe id="proxy-frame" src="about:blank" allow="fullscreen"></iframe>',
-	"redistribution proxy iframe"
-);
-redistDocument = replaceOnce(
-	redistDocument,
-	'const PROXY_SRC = new URL("./pulsar/public/index.html", document.baseURI).href;',
-	`const PROXY_SRC = ${JSON.stringify(redistPulsarUrl)};`,
-	"redistribution proxy URL"
-);
-const redistProxyLoadCall = "window.__redistLoadCdnPage(frame);";
-const redistProxyAssignments = redistDocument.split("frame.src = PROXY_SRC;").length - 1;
-if (redistProxyAssignments === 0) throw new Error("Could not find redistribution proxy assignments.");
-redistDocument = redistDocument.replaceAll("frame.src = PROXY_SRC;", redistProxyLoadCall);
-writeFileSync(join(redistDir, "index.html"), redistDocument);
 
 // Publish HTML-compatible clones as SVG documents. jsDelivr serves SVG with
-// image/svg+xml, but intentionally serves repository HTML as text/plain.
-// Load the HTML through raw.githack, which preserves a real document URL and
-// text/html content type so navigation and the app's service worker work.
+// image/svg+xml, but intentionally serves repository HTML as text/plain. Each
+// clone registers the root service worker first: it re-serves same-origin
+// .html documents as text/html, so the frame keeps a real document URL with
+// working relative URLs, same-origin access, and the app's service worker.
 const svgCdnBase = "https://cdn.jsdelivr.net/gh/shayderrr/eclipse@main/";
-const svgHtmlBase = "https://raw.githack.com/shayderrr/eclipse/main/";
+const svgHtmlBase = svgCdnBase;
 const rootServiceWorker = `
 const AI_API_UPSTREAM = "https://nova.notrexed.workers.dev";
 const MUSIC_PROXY_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -440,6 +355,33 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
   const path = url.pathname.replace(/\\/+$/, "");
+
+  if (/\.html$/i.test(path)) {
+    // jsDelivr serves repository .html as text/plain with nosniff, which would
+    // render as raw text in frames. Re-serve it as a real HTML document so
+    // relative URLs, same-origin access, and nested document loads keep a
+    // normal document URL.
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(event.request);
+        const headers = new Headers(response.headers);
+        headers.set("content-type", "text/html; charset=utf-8");
+        headers.delete("x-content-type-options");
+        return new Response(await response.arrayBuffer(), {
+          status: response.status,
+          statusText: response.statusText,
+          headers,
+        });
+      } catch (error) {
+        return new Response(
+          "Failed to load " + url.href + ": " + (error?.message || error),
+          { status: 502, headers: { "content-type": "text/html; charset=utf-8" } }
+        );
+      }
+    })());
+    return;
+  }
+
   if (path.endsWith("/api/ai")) {
     event.respondWith(proxyAi(event.request));
     return;
@@ -455,17 +397,39 @@ const svgEscape = (value) => String(value)
 	.replaceAll(">", "&gt;")
 	.replaceAll('"', "&quot;");
 
-function makeSvgClone({ title, sourcePath }) {
+function makeSvgClone({ title, sourcePath, serviceWorkerUrl }) {
 	const sourceUrl = JSON.stringify(`${svgHtmlBase}${sourcePath}`);
+	const swUrl = serviceWorkerUrl || `new URL("./sw.js", document.baseURI).href`;
 	const runtime = `<script><![CDATA[
 (() => {
   const SOURCE_URL = ${sourceUrl};
+  const SW_URL = ${swUrl};
   const frame = document.getElementById("svg-html-frame");
 
-  // jsDelivr serves .html files as text/plain. Navigate to raw.githack's
-  // text/html copy instead of an opaque inline document, so relative URLs,
-  // navigation, and the root service worker retain a normal document URL.
-  if (frame) frame.src = SOURCE_URL;
+  // jsDelivr serves repository .html as text/plain, which would render as raw
+  // text in a frame. Register the root service worker first: it re-serves
+  // same-origin .html documents as text/html, so the frame keeps a real
+  // document URL with working relative URLs, same-origin access, and the
+  // app's own service worker.
+  let loaded = false;
+  const load = () => {
+    if (loaded || !frame) return;
+    loaded = true;
+    frame.src = SOURCE_URL;
+  };
+
+  if (frame && "serviceWorker" in navigator) {
+    navigator.serviceWorker
+      .register(SW_URL, { scope: "./", updateViaCache: "none" })
+      .then(() => navigator.serviceWorker.ready)
+      .then(() => {
+        if (navigator.serviceWorker.controller) load();
+        else navigator.serviceWorker.addEventListener("controllerchange", load, { once: true });
+      })
+      .catch(() => load());
+  } else {
+    load();
+  }
 })();
 ]]></script>`;
 	return `<?xml version="1.0" encoding="UTF-8"?>
@@ -500,11 +464,13 @@ const svgClones = [
 		output: join(publicDir, "index.svg"),
 		title: "Pulsar",
 		sourcePath: "pulsar/public/index.html",
+		serviceWorkerUrl: `new URL("../../sw.js", document.baseURI).href`,
 	},
 	{
 		output: join(publicDir, "404.svg"),
 		title: "Pulsar Not Found",
 		sourcePath: "pulsar/public/404.html",
+		serviceWorkerUrl: `new URL("../../sw.js", document.baseURI).href`,
 	},
 ];
 for (const clone of svgClones) writeFileSync(clone.output, makeSvgClone(clone));

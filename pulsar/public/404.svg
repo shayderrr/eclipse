@@ -7,13 +7,34 @@
   </foreignObject>
   <script><![CDATA[
 (() => {
-  const SOURCE_URL = "https://raw.githack.com/shayderrr/eclipse/main/pulsar/public/404.html";
+  const SOURCE_URL = "https://cdn.jsdelivr.net/gh/shayderrr/eclipse@main/pulsar/public/404.html";
+  const SW_URL = new URL("../../sw.js", document.baseURI).href;
   const frame = document.getElementById("svg-html-frame");
 
-  // jsDelivr serves .html files as text/plain. Navigate to raw.githack's
-  // text/html copy instead of an opaque inline document, so relative URLs,
-  // navigation, and the root service worker retain a normal document URL.
-  if (frame) frame.src = SOURCE_URL;
+  // jsDelivr serves repository .html as text/plain, which would render as raw
+  // text in a frame. Register the root service worker first: it re-serves
+  // same-origin .html documents as text/html, so the frame keeps a real
+  // document URL with working relative URLs, same-origin access, and the
+  // app's own service worker.
+  let loaded = false;
+  const load = () => {
+    if (loaded || !frame) return;
+    loaded = true;
+    frame.src = SOURCE_URL;
+  };
+
+  if (frame && "serviceWorker" in navigator) {
+    navigator.serviceWorker
+      .register(SW_URL, { scope: "./", updateViaCache: "none" })
+      .then(() => navigator.serviceWorker.ready)
+      .then(() => {
+        if (navigator.serviceWorker.controller) load();
+        else navigator.serviceWorker.addEventListener("controllerchange", load, { once: true });
+      })
+      .catch(() => load());
+  } else {
+    load();
+  }
 })();
 ]]></script>
 </svg>
