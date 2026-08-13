@@ -1,0 +1,17 @@
+/sw.js
+  Cache-Control: no-cache
+
+/register-sw.js
+  Cache-Control: no-cache
+
+/index.html
+  Cache-Control: no-cache
+
+/config.js
+  Cache-Control: no-cache
+
+/*.html
+  Cache-Control: no-cache
+
+/*
+  Cache-Control: public, max-age=86400

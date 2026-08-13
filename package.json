@@ -1,0 +1,27 @@
+{
+  "name": "eclipse-unblocked",
+  "version": "1.0.2",
+  "description": "Eclipse Unblocked: a glass-themed static games, movies, music, AI, chat, and web proxy portal.",
+  "type": "module",
+  "unpkg": "index.html",
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "eclipse",
+    "unblocked",
+    "games",
+    "proxy",
+    "static-site"
+  ],
+  "license": "AGPL-3.0-or-later",
+  "files": [
+    "index.html",
+    "chat.html",
+    "player.html",
+    "pulsar"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

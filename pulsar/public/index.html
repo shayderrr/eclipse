@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1.0, shrink-to-fit=no"
+		/>
+		<title>Pulsar</title>
+		<link rel="shortcut icon" href="./favi.png" />
+		<link
+			id="sj-icon-font"
+			href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined"
+			rel="stylesheet"
+		/>
+
+		<style>
+			html.pulsar-instant,
+			html.pulsar-instant body {
+				background: #000;
+				overflow: hidden;
+			}
+
+			html.pulsar-instant .browser-shell,
+			html.pulsar-instant .settings-modal,
+			html.pulsar-instant noscript {
+				display: none !important;
+			}
+
+			html.pulsar-instant::before {
+				content: "";
+				position: fixed;
+				top: 50%;
+				left: 50%;
+				width: 38px;
+				height: 38px;
+				margin: -46px 0 0 -19px;
+				border: 3px solid rgba(255, 255, 255, 0.1);
+				border-top-color: #8d01ff;
+				border-radius: 50%;
+				animation: pulsar-instant-spin 1s linear infinite;
+				z-index: 2147483646;
+			}
+
+			html.pulsar-instant::after {
+				content: "Loading...";
+				position: fixed;
+				top: 50%;
+				left: 0;
+				right: 0;
+				margin-top: 8px;
+				text-align: center;
+				font:
+					600 14px/1.4 "Plus Jakarta Sans",
+					system-ui,
+					-apple-system,
+					"Segoe UI",
+					sans-serif;
+				color: #8d01ff;
+				z-index: 2147483646;
+			}
+
+			@keyframes pulsar-instant-spin {
+				to {
+					transform: rotate(360deg);
+				}
+			}
+		</style>
+		<script>
+			(function () {
+				if (!/^\?=.+/.test(location.search)) return;
+				document.documentElement.classList.add("pulsar-instant");
+				var icons = document.getElementById("sj-icon-font");
+				if (icons) icons.media = "print";
+			})();
+		</script>
+
+		<link rel="stylesheet" href="./index.css" />
+
+		<script src="./config.js" defer></script>
+		<script src="./register-sw.js" defer></script>
+		<script src="./search.js" defer></script>
+		<script src="./adblxck/index.js" defer></script>
+		<script src="./scramjet/scramjet.js"></script>
+		<script src="./controller/controller.api.js"></script>
+		<script src="./index.js" type="module"></script>
+	</head>
+
+	<body>
+		<noscript>turn on javascript to use pulsar</noscript>
+		<main class="browser-shell surface autohide" aria-label="Pulsar">
+			<form id="sj-form" class="browser-form">
+				<div class="tabs" style="--tab-content-margin: 9px" aria-label="Tabs">
+					<div id="sj-tabs" class="tabs-content"></div>
+					<button
+						id="sj-new-tab"
+						class="browser-button"
+						type="button"
+						title="New tab"
+						aria-label="New tab"
+					>
+						<span class="material-symbols-outlined" aria-hidden="true">add</span>
+						<span class="title">New Tab</span>
+					</button>
+				</div>
+
+				<div class="under-tabs">
+					<div class="tabs-bottom-bar"></div>
+					<ul class="utility">
+						<li class="nav-cluster">
+							<button
+								id="sj-back"
+								class="utilityIcon"
+								type="button"
+								title="Back"
+								aria-label="Back"
+							>
+								<span
+									class="material-symbols-outlined backButton"
+									aria-hidden="true"
+									>arrow_back</span
+								>
+							</button>
+						</li>
+						<li class="nav-cluster">
+							<button
+								id="sj-reload"
+								class="utilityIcon"
+								type="button"
+								title="Reload"
+								aria-label="Reload"
+							>
+								<span
+									class="material-symbols-outlined refreshButton"
+									aria-hidden="true"
+									>refresh</span
+								>
+							</button>
+						</li>
+						<li class="nav-cluster">
+							<button
+								id="sj-forward"
+								class="utilityIcon"
+								type="button"
+								title="Forward"
+								aria-label="Forward"
+							>
+								<span
+									class="material-symbols-outlined forwardButton"
+									aria-hidden="true"
+									>arrow_forward</span
+								>
+							</button>
+						</li>
+
+						<div class="search-header">
+							<input
+								id="sj-address"
+								class="search-header__input"
+								type="text"
+								placeholder="Enter search or web address"
+								autocomplete="off"
+								aria-label="Address"
+							/>
+							<span class="address-status" aria-hidden="true"></span>
+							<button
+								aria-label="Search"
+								type="submit"
+								class="search-header__button"
+							>
+								<svg
+									fill="none"
+									viewBox="0 0 18 18"
+									height="18"
+									width="18"
+									class="search-header__icon"
+									aria-hidden="true"
+								>
+									<path
+										d="M7.132 0C3.197 0 0 3.124 0 6.97c0 3.844 3.197 6.969 7.132 6.969 1.557 0 2.995-.49 4.169-1.32L16.82 18 18 16.847l-5.454-5.342a6.846 6.846 0 0 0 1.718-4.536C14.264 3.124 11.067 0 7.132 0zm0 .82c3.48 0 6.293 2.748 6.293 6.15 0 3.4-2.813 6.149-6.293 6.149S.839 10.37.839 6.969C.839 3.568 3.651.82 7.132.82z"
+									></path>
+								</svg>
+							</button>
+							<button
+								id="sj-shield-button"
+								class="shield-button"
+								type="button"
+								title="Pulsar Shields"
+								aria-label="Pulsar Shields"
+								aria-haspopup="dialog"
+								aria-expanded="false"
+							>
+								<span class="material-symbols-outlined" aria-hidden="true"
+									>shield</span
+								>
+								<span id="sj-shield-count-mini">0</span>
+							</button>
+
+							<div
+								id="sj-shield-popup"
+								class="shield-popup hidden"
+								role="dialog"
+								aria-label="Pulsar Shields"
+							>
+								<header class="shield-popup-header">
+									<div class="shield-site-badge" aria-hidden="true">
+										<span class="material-symbols-outlined">verified_user</span>
+									</div>
+									<div>
+										<strong id="sj-shield-site">New tab</strong>
+										<small id="sj-shield-status">Shields ready</small>
+									</div>
+									<label class="mini-toggle" title="Toggle Shields for this site">
+										<input id="sj-shield-main-toggle" type="checkbox" checked />
+										<span aria-hidden="true"></span>
+									</label>
+								</header>
+
+								<div class="shield-block-count">
+									<strong id="sj-shield-blocked-count">0</strong>
+									<span>trackers, ads, scripts, and risky requests blocked</span>
+								</div>
+
+								<div class="shield-section-title">
+									<span class="material-symbols-outlined" aria-hidden="true"
+										>tune</span
+									>
+									<span>Advanced options</span>
+								</div>
+
+								<label class="shield-control">
+									<span>Trackers &amp; ads</span>
+									<select id="sj-shield-tracker-mode">
+										<option value="standard">Standard Block (Default)</option>
+										<option value="aggressive">Aggressively block</option>
+										<option value="off">Off</option>
+									</select>
+								</label>
+
+								<label class="shield-control">
+									<span>Upgrade connections to HTTPS</span>
+									<input id="sj-shield-https-toggle" type="checkbox" checked />
+									<span class="toggle-visual" aria-hidden="true"></span>
+								</label>
+
+								<label class="shield-control">
+									<span>Block scripts</span>
+									<input id="sj-shield-scripts-toggle" type="checkbox" />
+									<span class="toggle-visual" aria-hidden="true"></span>
+								</label>
+
+								<label class="shield-control">
+									<span>Block fingerprinting</span>
+									<input
+										id="sj-shield-fingerprinting-toggle"
+										type="checkbox"
+										checked
+									/>
+									<span class="toggle-visual" aria-hidden="true"></span>
+								</label>
+
+								<label class="shield-control">
+									<span>Block third-party cookies</span>
+									<input id="sj-shield-cookies-toggle" type="checkbox" checked />
+									<span class="toggle-visual" aria-hidden="true"></span>
+								</label>
+
+								<label class="shield-control">
+									<span>Forget me when I close this site</span>
+									<input id="sj-shield-forget-toggle" type="checkbox" />
+									<span class="toggle-visual" aria-hidden="true"></span>
+								</label>
+
+								<div class="shield-actions">
+									<button id="sj-shield-clear-site" type="button">
+										Clear site data
+									</button>
+									<button id="sj-shield-open-settings" type="button">
+										Global Settings
+									</button>
+								</div>
+
+								<p class="shield-footnote">
+									If a site breaks, try Shields down. That can reduce Pulsar's
+									privacy protections.
+								</p>
+							</div>
+
+							<div
+								id="sj-suggestions"
+								class="suggestion-list"
+								role="listbox"
+							></div>
+						</div>
+
+						<div class="right">
+							<li>
+								<button
+									id="sj-bookmarks-button"
+									class="utilityIcon"
+									type="button"
+									title="Bookmarks"
+									aria-label="Bookmarks"
+								>
+									<span class="material-symbols-outlined" aria-hidden="true"
+										>star</span
+									>
+								</button>
+							</li>
+							<li>
+								<button
+									id="sj-fullscreen-button"
+									class="utilityIcon"
+									type="button"
+									title="Fullscreen page"
+									aria-label="Fullscreen proxied page"
+								>
+									<span class="material-symbols-outlined" aria-hidden="true"
+										>fullscreen</span
+									>
+								</button>
+							</li>
+							<li>
+								<button
+									id="sj-settings-button"
+									class="utilityIcon"
+									type="button"
+									title="Settings"
+									aria-label="Settings"
+								>
+									<span class="material-symbols-outlined" aria-hidden="true"
+										>settings</span
+									>
+								</button>
+							</li>
+
+							<div
+								id="sj-bookmarks-drawer"
+								class="bookmarks-drawer hidden"
+								role="dialog"
+								aria-label="Bookmarks"
+							>
+								<header class="bookmarks-drawer-header">
+									<strong>Bookmarks</strong>
+									<button
+										id="sj-bookmarks-add"
+										class="bookmarks-add-btn"
+										type="button"
+										title="Bookmark current page"
+									>
+										<span class="material-symbols-outlined" aria-hidden="true"
+											>add</span
+										>
+									</button>
+								</header>
+								<div id="sj-bookmarks-list" class="bookmarks-list"></div>
+								<footer class="bookmarks-drawer-footer">
+									<button id="sj-bookmarks-close" type="button">Close</button>
+								</footer>
+							</div>
+						</div>
+					</ul>
+				</div>
+
+				<div class="loading-track" aria-hidden="true">
+					<div id="sj-loading-bar" class="loading-bar"></div>
+				</div>
+			</form>
+
+			<section id="sj-viewport" class="viewport">
+				<canvas id="particles" aria-hidden="true"></canvas>
+				<div id="sj-home" class="start-page">
+					<div class="banner">
+						<h1 class="banner__title animate title">Pulsar</h1>
+					</div>
+					<p id="sj-tagline" class="tagline animate title">v2.0.67-alpha.2</p>
+
+					<div class="search-header animate search">
+						<button
+							type="button"
+							id="sj-home-search"
+							class="search-header__button"
+							aria-label="Search"
+							title="Search"
+						>
+							<svg
+								fill="none"
+								viewBox="0 0 18 18"
+								height="18"
+								width="18"
+								class="search-header__icon"
+								aria-hidden="true"
+							>
+								<path
+									d="M7.132 0C3.197 0 0 3.124 0 6.97c0 3.844 3.197 6.969 7.132 6.969 1.557 0 2.995-.49 4.169-1.32L16.82 18 18 16.847l-5.454-5.342a6.846 6.846 0 0 0 1.718-4.536C14.264 3.124 11.067 0 7.132 0zm0 .82c3.48 0 6.293 2.748 6.293 6.15 0 3.4-2.813 6.149-6.293 6.149S.839 10.37.839 6.969C.839 3.568 3.651.82 7.132.82z"
+								></path>
+							</svg>
+						</button>
+						<input
+							id="sj-home-address"
+							class="search-header__input"
+							type="text"
+							placeholder="Search the Web..."
+							autocomplete="off"
+							aria-label="New tab search"
+						/>
+					</div>
+
+					<div class="start-page-search-engine animate search">
+						<select id="sj-engine-select" class="engine-select">
+							<option value="https://search.brave.com/search?q=%s">Brave</option>
+							<option value="https://duckduckgo.com/?q=%s">DuckDuckGo</option>
+							<option value="https://www.google.com/search?q=%s">Google</option>
+						</select>
+					</div>
+
+					<div
+						class="quick-grid animate shortcuts"
+						aria-label="Quick destinations"
+					>
+						<button type="button" data-url="https://duck.ai">
+							<span
+								><span class="material-symbols-outlined" aria-hidden="true"
+									>auto_awesome</span
+								></span
+							>
+							Duck AI
+						</button>
+						<button type="button" data-url="https://aether.bar">
+							<span
+								><span class="material-symbols-outlined" aria-hidden="true"
+									>movie</span
+								></span
+							>
+							Movies
+						</button>
+						<button type="button" data-url="https://tiktok.com">
+							<span
+								><span class="material-symbols-outlined" aria-hidden="true"
+									>music_note</span
+								></span
+							>
+							TikTok
+						</button>
+						<button type="button" data-url="https://invidious.f5.si">
+							<span
+								><span class="material-symbols-outlined" aria-hidden="true"
+									>play_circle</span
+								></span
+							>
+							YouTube
+						</button>
+						<button type="button" data-url="https://omoggle.com">
+							<span
+								><span class="material-symbols-outlined" aria-hidden="true"
+									>forum</span
+								></span
+							>
+							Omoggle
+						</button>
+					</div>
+				</div>
+
+				<div id="sj-page-loader" class="page-loader" aria-live="polite">
+					<div class="page-loader-mark" aria-hidden="true">
+						<span></span>
+						<span></span>
+						<span></span>
+					</div>
+					<p id="sj-page-loader-text">Loading...</p>
+				</div>
+
+				<div id="sj-error-panel" class="error-panel" aria-live="polite">
+					<p id="sj-error"></p>
+					<pre id="sj-error-code"></pre>
+				</div>
+			</section>
+		</main>
+
+		<div id="sj-settings-panel" class="settings-modal hidden">
+			<div
+				class="settings-card"
+				role="dialog"
+				aria-modal="true"
+				aria-label="Settings"
+			>
+				<header class="settings-header">
+					<div>
+						<p class="eyebrow">Pulsar</p>
+						<h2>Settings</h2>
+					</div>
+					<button
+						id="sj-settings-close"
+						class="close-button"
+						type="button"
+						aria-label="Close settings"
+					>
+						<span class="material-symbols-outlined" aria-hidden="true"
+							>close</span
+						>
+					</button>
+				</header>
+
+				<div class="settings-layout">
+					<nav class="settings-nav sideSnav" aria-label="Settings sections">
+						<button class="active" type="button" data-settings-tab="network">
+							Network
+						</button>
+						<button type="button" data-settings-tab="search">Search</button>
+						<button type="button" data-settings-tab="privacy">Shields</button>
+						<button type="button" data-settings-tab="security">Privacy</button>
+						<button type="button" data-settings-tab="scripts">Scripts</button>
+					</nav>
+
+					<div class="settings-content">
+						<section class="settings-pane active" data-settings-pane="network">
+							<label class="settings-row">
+								<span>
+									<strong>Wisp Server</strong>
+									<small>Active proxy endpoint</small>
+								</span>
+								<select
+									id="sj-wisp-select-top"
+									title="Choose Wisp server"
+								></select>
+							</label>
+
+							<label class="settings-row">
+								<span>
+									<strong>Transport</strong>
+									<small>Proxy transport backend</small>
+								</span>
+								<select
+									id="sj-transport-select"
+									title="Choose proxy transport"
+								></select>
+							</label>
+
+							<label class="settings-row">
+								<span>
+									<strong>Tor Server</strong>
+									<small>Detected automatically from your Wisp servers</small>
+								</span>
+								<select
+									id="sj-tor-select"
+									title="Choose Tor (wisptor) server"
+								></select>
+							</label>
+						</section>
+
+						<section class="settings-pane" data-settings-pane="search">
+							<label class="settings-row">
+								<span>
+									<strong>Search Engine</strong>
+									<small>Address bar fallback</small>
+								</span>
+								<select id="sj-engine-select-settings">
+									<option value="https://search.brave.com/search?q=%s">
+										Brave
+									</option>
+									<option value="https://duckduckgo.com/?q=%s">
+										DuckDuckGo
+									</option>
+									<option value="https://www.google.com/search?q=%s">
+										Google
+									</option>
+								</select>
+							</label>
+						</section>
+
+						<section class="settings-pane" data-settings-pane="privacy">
+							<div class="settings-copy">
+								<strong>Pulsar Shields</strong>
+								<small>
+									A way to further increase your protection when browsing! This can stop things like trackers, unwanted ads, and popups.
+								</small>
+							</div>
+
+							<label
+								class="toggle-row"
+								title="Enable Shields by default for proxied pages"
+							>
+								<span>
+									<strong>Shields by default</strong>
+									<small>Turn privacy protections on for new sites</small>
+								</span>
+								<input id="sj-shields-toggle-settings" type="checkbox" checked />
+								<span class="toggle-visual" aria-hidden="true"></span>
+							</label>
+
+							<label
+								class="toggle-row"
+								title="Block common ad and tracker requests inside proxied pages"
+							>
+								<span>
+									<strong>Ad and tracker blocking</strong>
+									<small
+										>Backed by EasyList, with EasyPrivacy in aggressive
+										mode</small
+									>
+								</span>
+								<input id="sj-adblock-toggle" type="checkbox" checked />
+								<span class="toggle-visual" aria-hidden="true"></span>
+							</label>
+
+							<label class="settings-row">
+								<span>
+									<strong>Trackers &amp; ads mode</strong>
+									<small
+										>Aggressive blocks more tracking, but may break more
+										sites</small
+									>
+								</span>
+								<select id="sj-tracker-mode-settings">
+									<option value="standard">Standard Block (Default)</option>
+									<option value="aggressive">Aggressive</option>
+									<option value="off">Off</option>
+								</select>
+							</label>
+
+							<label
+								class="toggle-row"
+								title="Upgrade http:// navigations to https:// when possible"
+							>
+								<span>
+									<strong>Upgrade connections to HTTPS</strong>
+									<small
+										>Rewrites typed HTTP links before Pulsar loads them</small
+									>
+								</span>
+								<input id="sj-https-upgrade-toggle" type="checkbox" checked />
+								<span class="toggle-visual" aria-hidden="true"></span>
+							</label>
+
+							<label
+								class="toggle-row"
+								title="Remove common tracking parameters from navigations"
+							>
+								<span>
+									<strong>Remove tracking parameters</strong>
+									<small>Strips utm, fbclid, gclid, and similar URL tags</small>
+								</span>
+								<input id="sj-strip-tracking-toggle" type="checkbox" checked />
+								<span class="toggle-visual" aria-hidden="true"></span>
+							</label>
+
+							<label
+								class="toggle-row"
+								title="Block unsafe new-tab popups inside proxied pages"
+							>
+								<span>
+									<strong>Popup Blocker</strong>
+									<small>Stops unsafe new tabs from proxied pages</small>
+								</span>
+								<input id="sj-popup-blocker-toggle" type="checkbox" checked />
+								<span class="toggle-visual" aria-hidden="true"></span>
+							</label>
+
+							<label
+								class="toggle-row"
+								title="Block script files inside proxied pages"
+							>
+								<span>
+									<strong>Block scripts</strong>
+									<small
+										>Very strict mode for suspicious pages; many sites need
+										scripts</small
+									>
+								</span>
+								<input id="sj-block-scripts-toggle" type="checkbox" />
+								<span class="toggle-visual" aria-hidden="true"></span>
+							</label>
+						</section>
+
+						<section class="settings-pane" data-settings-pane="security">
+							<div class="settings-copy">
+								<strong>Fingerprinting &amp; storage</strong>
+								<small>
+									These options can enhance your privacy when browsing pages, especially more sketchy ones. Although these can IMPROVE your privacy, do not always rely on them to give you full anonymity. If you want that instead, we encourage you to use Onion/Tor links.
+								</small>
+							</div>
+
+							<label
+								class="toggle-row"
+								title="Send Global Privacy Control and Do Not Track signals"
+							>
+								<span>
+									<strong>Send GPC and Do Not Track</strong>
+									<small>Asks sites not to sell or share data</small>
+								</span>
+								<input id="sj-gpc-toggle" type="checkbox" checked />
+								<span class="toggle-visual" aria-hidden="true"></span>
+							</label>
+
+							<label
+								class="toggle-row"
+								title="Reduce fingerprinting APIs inside proxied pages"
+							>
+								<span>
+									<strong>Fingerprinting protection</strong>
+									<small
+										>Masks selected navigator, canvas, and WebGL signals</small
+									>
+								</span>
+								<input id="sj-fingerprinting-toggle" type="checkbox" checked />
+								<span class="toggle-visual" aria-hidden="true"></span>
+							</label>
+
+							<label
+								class="toggle-row"
+								title="Disable WebRTC inside proxied pages"
+							>
+								<span>
+									<strong>Prevent WebRTC IP leaks</strong>
+									<small
+										>Blocks peer connections that can reveal local network
+										details</small
+									>
+								</span>
+								<input id="sj-webrtc-toggle" type="checkbox" checked />
+								<span class="toggle-visual" aria-hidden="true"></span>
+							</label>
+
+							<label
+								class="toggle-row"
+								title="Drop cookies on cross-site requests where Pulsar can detect them"
+							>
+								<span>
+									<strong>Block third-party cookies</strong>
+									<small
+										>Experimental in proxied pages; may affect sign-in
+										flows</small
+									>
+								</span>
+								<input
+									id="sj-third-party-cookies-toggle"
+									type="checkbox"
+									checked
+								/>
+								<span class="toggle-visual" aria-hidden="true"></span>
+							</label>
+
+							<label
+								class="toggle-row"
+								title="Clear proxied site storage when a tab closes"
+							>
+								<span>
+									<strong>Forget closed sites</strong>
+									<small
+										>Clears frame storage and cookies when closing a protected
+										tab</small
+									>
+								</span>
+								<input id="sj-forget-site-toggle-settings" type="checkbox" />
+								<span class="toggle-visual" aria-hidden="true"></span>
+							</label>
+
+							<label
+								class="toggle-row"
+								title="Click the last hovered element inside proxied pages"
+							>
+								<span>
+									<strong>Auto Clicker</strong>
+									<small>Only runs inside proxied pages</small>
+								</span>
+								<input id="sj-autoclicker-toggle" type="checkbox" />
+								<span class="toggle-visual" aria-hidden="true"></span>
+							</label>
+
+							<label class="settings-row">
+								<span>
+									<strong>Click Delay</strong>
+									<small>Milliseconds between auto clicks</small>
+								</span>
+								<input
+									id="sj-autoclicker-delay"
+									class="settings-number"
+									type="number"
+									min="25"
+									max="10000"
+									step="25"
+									value="250"
+									inputmode="numeric"
+								/>
+							</label>
+
+							<button
+								id="sj-clear-data-button"
+								class="settings-action-button"
+								type="button"
+							>
+								Clear Pulsar history and cached privacy data
+							</button>
+						</section>
+
+						<section class="settings-pane" data-settings-pane="scripts">
+							<div class="settings-copy">
+								<strong>Custom Scripts</strong>
+								<small>
+									These scripts are injected into every proxied page. Use
+									bookmarklet syntax (javascript:...) or raw JavaScript. Each
+									script runs after the page loads.
+								</small>
+							</div>
+
+							<label class="toggle-row" title="Enable custom script injection">
+								<span>
+									<strong>Enable script injection</strong>
+									<small>Inject scripts into proxied pages automatically</small>
+								</span>
+								<input id="sj-scripts-toggle" type="checkbox" />
+								<span class="toggle-visual" aria-hidden="true"></span>
+							</label>
+
+							<div id="sj-scripts-list" class="scripts-list"></div>
+
+							<button
+								id="sj-scripts-add"
+								class="settings-action-button scripts-add-btn"
+								type="button"
+							>
+								Add Script
+							</button>
+						</section>
+					</div>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

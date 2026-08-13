@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Player</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0a0a;
+  --card: #141414;
+  --border: rgba(255,255,255,0.07);
+  --muted: rgba(255,255,255,0.4);
+  --accent: #7c6aff;
+  --accent-dim: rgba(124,106,255,0.14);
+}
+
+html, body { height: 100%; background: var(--bg); color: #fff; font-family: 'DM Sans', sans-serif; overflow: hidden; }
+#app { width: 100vw; height: 100vh; display: flex; flex-direction: column; position: relative; }
+#player-area { flex: 1; position: relative; background: #000; }
+#iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; display: block; background: #000; }
+#native-video { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; display: none; transform: translateZ(0); }
+#native-video.active { display: block; object-fit: contain; }
+
+#subtitle-overlay {
+  position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+  z-index: 30; pointer-events: none; text-align: center; width: 80%; max-width: 900px;
+}
+#subtitle-text {
+  display: inline-block; background: rgba(0,0,0,0.72); color: #fff;
+  font-size: 18px; font-weight: 500; line-height: 1.45; padding: 4px 14px; border-radius: 6px;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8); letter-spacing: 0.01em;
+  white-space: pre-wrap;
+  opacity: 0; transition: opacity 0.12s;
+}
+#subtitle-text.visible { opacity: 1; }
+
+#quality-panel { position:absolute; right:14px; bottom:76px; z-index:60; background:rgba(10,10,10,0.97); border:1px solid rgba(255,255,255,0.1); border-radius:12px; min-width:160px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.7); transform:translateY(8px) scale(0.95); opacity:0; pointer-events:none; transition:all 0.17s cubic-bezier(0.34,1.56,0.64,1); display:none; }
+#quality-panel.open { transform:translateY(0) scale(1); opacity:1; pointer-events:all; display:block; }
+.qp-head { padding:10px 14px; font-size:10.5px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:rgba(255,255,255,0.4); border-bottom:1px solid rgba(255,255,255,0.07); display:flex; align-items:center; justify-content:space-between; }
+.qp-close { background:none; border:none; color:rgba(255,255,255,0.3); cursor:pointer; font-size:11px; padding:2px; }
+.qp-close:hover { color:#fff; }
+.qp-item { display:flex; align-items:center; justify-content:space-between; padding:9px 14px; cursor:pointer; font-size:13px; color:rgba(255,255,255,0.7); transition:all 0.12s; gap:10px; }
+.qp-item:hover { background:rgba(255,255,255,0.06); color:#fff; }
+.qp-item.active { color:var(--accent); font-weight:600; }
+.qp-item.active::after { content:"✓"; font-size:10px; }
+.qp-badge { font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.07); color:rgba(255,255,255,0.35); }
+.qp-item.active .qp-badge { background:rgba(124,106,255,0.12); color:var(--accent); }
+#caption-panel {
+  position: absolute; right: 14px; bottom: 76px; z-index: 60;
+  background: rgba(10,10,10,0.97); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px; min-width: 220px; max-width: 260px; overflow: hidden;
+  background: rgba(10,10,10,0.97); border: 1px solid rgba(255,255,255,0.1);
+  transform: translateY(8px) scale(0.95); opacity: 0; pointer-events: none;
+  transition: all 0.17s cubic-bezier(0.34,1.56,0.64,1); display: none;
+}
+#caption-panel.open { transform: translateY(0) scale(1); opacity: 1; pointer-events: all; display: block; }
+.cp-head { padding: 10px 14px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: rgba(255,255,255,0.4); border-bottom: 1px solid rgba(255,255,255,0.07);
+  display: flex; align-items: center; justify-content: space-between; }
+.cp-close { background: none; border: none; color: rgba(255,255,255,0.3); cursor: pointer; font-size: 11px; padding: 2px; }
+.cp-close:hover { color: #fff; }
+#caption-status { padding: 8px 14px; font-size: 11px; color: rgba(255,255,255,0.35); border-bottom: 1px solid rgba(255,255,255,0.05); }
+#caption-list { max-height: 220px; overflow-y: auto; }
+#caption-list::-webkit-scrollbar { width: 4px; }
+#caption-list::-webkit-scrollbar-track { background: transparent; }
+#caption-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+.cap-item { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px;
+  cursor: pointer; font-size: 13px; color: rgba(255,255,255,0.7); transition: all 0.12s; gap: 10px; }
+.cap-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+.cap-item.active { color: var(--accent); font-weight: 600; }
+.cap-item.active::after { content: '✓'; font-size: 10px; }
+.cap-off { color: rgba(255,255,255,0.4); font-style: italic; }
+.cap-off.active { color: var(--accent); font-style: normal; }
+
+#loader {
+  position: absolute; inset: 0; background: #000; z-index: 10;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  transition: opacity 0.4s;
+}
+#loader.gone { opacity: 0; pointer-events: none; }
+.spinner { width: 32px; height: 32px; border: 2px solid rgba(255,255,255,0.08); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.75s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#loader-title { font-size: 13px; color: var(--muted); letter-spacing: 0.04em; }
+
+#vol-wrap { display:flex; align-items:center; }
+#vol-track-wrap { width:0; overflow:hidden; transition:width 0.2s; display:flex; align-items:center; }
+#vol-wrap:hover #vol-track-wrap { width:70px; }
+#vol-track { position:relative; width:62px; height:20px; display:flex; align-items:center; cursor:pointer; margin:0 4px; }
+#vol-track::before { content:''; position:absolute; left:0; right:0; height:3px; background:rgba(255,255,255,0.2); border-radius:3px; }
+#vol-fill { position:absolute; left:0; height:3px; background:rgba(255,255,255,0.75); border-radius:3px; width:100%; pointer-events:none; }
+#vol-range { position:absolute; inset:0; width:100%; opacity:0; cursor:pointer; margin:0; }
+
+#ctrl-time { font-size:11.5px; color:rgba(255,255,255,0.55); display:flex; align-items:center; gap:3px; padding:0 5px; white-space:nowrap; font-variant-numeric:tabular-nums; line-height:1; }
+#t-cur { display:inline-block; min-width:38px; text-align:right; }
+#t-dur { display:inline-block; min-width:38px; text-align:left; }
+#t-sep { opacity:0.3; }
+
+.ctrl-lbl { font-size:11px; color:rgba(255,255,255,0.45); font-weight:600; letter-spacing:0.04em; }
+.ctrl-inp { width:40px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); border-radius:6px; color:#fff; font-family:'DM Sans',sans-serif; font-size:12px; padding:4px 6px; outline:none; text-align:center; -moz-appearance:textfield; }
+.ctrl-inp::-webkit-inner-spin-button { display:none; }
+.ctrl-inp:focus { border-color:rgba(124,106,255,0.4); }
+
+#center-controls { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); display:flex; align-items:center; gap:24px; opacity:0; transition:opacity 0.2s; pointer-events:none; }
+#player-area:hover #center-controls, #ctrl-wrap.paused #center-controls { opacity:1; pointer-events:all; }
+.cc-btn { background:rgba(0,0,0,0.55); border:none; color:rgba(255,255,255,0.85); cursor:pointer; width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:all 0.15s; }
+.cc-btn:hover { background:rgba(255,255,255,0.15); color:#fff; transform:scale(1.08); }
+.cc-btn:active { transform:scale(0.93); }
+.cc-play { width:64px; height:64px; background:rgba(0,0,0,0.55); }
+.cc-play:hover { background:rgba(255,255,255,0.18); }
+
+.qp-head { padding:10px 14px; font-size:10.5px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:rgba(255,255,255,0.4); border-bottom:1px solid rgba(255,255,255,0.07); display:flex; align-items:center; justify-content:space-between; }
+.qp-close { background:none; border:none; color:rgba(255,255,255,0.3); cursor:pointer; font-size:11px; padding:2px; }
+.qp-close:hover { color:#fff; }
+.qp-item { display:flex; align-items:center; justify-content:space-between; padding:9px 14px; cursor:pointer; font-size:13px; color:rgba(255,255,255,0.7); transition:all 0.12s; gap:10px; }
+.qp-item:hover { background:rgba(255,255,255,0.06); color:#fff; }
+.qp-item.active { color:var(--accent); font-weight:600; }
+.qp-item.active::after { content:'✓'; font-size:10px; }
+.qp-badge { font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.07); color:rgba(255,255,255,0.35); }
+.qp-item.active .qp-badge { background:rgba(124,106,255,0.12); color:var(--accent); }
+
+.seek-flash { position:absolute; top:50%; transform:translateY(-50%); width:72px; height:72px; border-radius:50%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff; pointer-events:none; flex-direction:column; gap:2px; }
+.seek-flash.left { left:12%; }
+.seek-flash.right { right:12%; }
+@keyframes flash-out { 0% { opacity:1; transform:translateY(-50%) scale(1); } 100% { opacity:0; transform:translateY(-50%) scale(1.25); } }
+
+#ctrl-wrap { position:absolute; inset:0; z-index:25; display:flex; flex-direction:column; justify-content:flex-end; pointer-events:none; }
+#ctrl-bar { position:relative; padding:0 18px 14px; background:linear-gradient(to top,rgba(0,0,0,0.9) 0%,rgba(0,0,0,0.45) 55%,transparent 100%); opacity:0; transition:opacity 0.22s; pointer-events:none; will-change:opacity; }
+#ctrl-bar.controls-visible { opacity:1; pointer-events:all; }
+#ctrl-wrap.paused #ctrl-bar { opacity:1; pointer-events:all; }
+
+#now-playing { display:flex; align-items:center; gap:10px; margin-bottom:14px; pointer-events:none; }
+#np-poster { width:60px; height:86px; object-fit:cover; border-radius:6px; box-shadow:0 4px 16px rgba(0,0,0,0.6); flex-shrink:0; }
+#np-title { font-size:20px; font-weight:700; line-height:1.2; color:#fff; }
+#np-sub { font-size:14px; color:rgba(255,255,255,0.5); margin-top:3px; }
+
+#ctrl-progress { position:relative; height:20px; cursor:pointer; display:flex; align-items:center; margin-bottom:6px; }
+#ctrl-progress::before { content:''; position:absolute; inset:0; margin:auto; height:3px; background:rgba(255,255,255,0.18); border-radius:3px; transition:height 0.15s; }
+#ctrl-progress:hover::before { height:5px; }
+#prog-buf, #prog-fill { position:absolute; left:0; top:50%; transform:translateY(-50%); height:3px; border-radius:3px; pointer-events:none; transition:height 0.15s, width 0.1s linear; }
+#ctrl-progress:hover #prog-buf, #ctrl-progress:hover #prog-fill { height:5px; }
+#prog-buf { background:rgba(255,255,255,0.22); width:0; }
+#prog-fill { background:var(--accent); width:0; z-index:1; }
+#prog-thumb { position:absolute; top:50%; transform:translate(-50%,-50%) scale(0); width:14px; height:14px; border-radius:50%; background:var(--accent); z-index:2; pointer-events:none; transition:transform 0.15s; box-shadow:0 0 8px rgba(124,106,255,0.6); }
+#ctrl-progress:hover #prog-thumb { transform:translate(-50%,-50%) scale(1); }
+
+#prog-tooltip { position:absolute; bottom:22px; transform:translateX(-50%); background:rgba(10,10,10,0.92); color:#fff; font-size:11px; font-weight:600; padding:3px 7px; border-radius:5px; pointer-events:none; opacity:0; transition:opacity 0.1s; white-space:nowrap; font-variant-numeric:tabular-nums; border:1px solid rgba(255,255,255,0.1); }
+#ctrl-progress:hover #prog-tooltip { opacity:1; }
+
+#ctrl-row { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+#ctrl-left, #ctrl-right { display:flex; align-items:center; gap:2px; height:36px; }
+
+.cbtn { background:none; border:none; color:rgba(255,255,255,0.75); cursor:pointer; padding:7px; border-radius:7px; display:flex; align-items:center; justify-content:center; gap:5px; transition:all 0.14s; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:500; flex-shrink:0; }
+.cbtn:hover { background:rgba(255,255,255,0.1); color:#fff; }
+.cbtn:active { transform:scale(0.91); }
+.cbtn-icon { padding:7px 8px; }
+.cbtn-go { background:var(--accent-dim); border:1px solid rgba(124,106,255,0.2); color:var(--accent); padding:4px 10px; font-size:11px; }
+.cbtn-go:hover { background:rgba(124,106,255,0.22); }
+.cbtn.cc-active { color: var(--accent); }
+
+#download-panel {
+  position: absolute; right: 14px; bottom: 76px; z-index: 60;
+  background: rgba(10,10,10,0.97); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px; min-width: 240px; overflow: hidden;
+  transform: translateY(8px) scale(0.95); opacity: 0; pointer-events: none;
+  transition: all 0.17s cubic-bezier(0.34,1.56,0.64,1); display: none;
+}
+#download-panel.open { transform: translateY(0) scale(1); opacity: 1; pointer-events: all; display: block; }
+.dp-head { padding: 10px 14px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: rgba(255,255,255,0.4); border-bottom: 1px solid rgba(255,255,255,0.07);
+  display: flex; align-items: center; justify-content: space-between; }
+.dp-close { background: none; border: none; color: rgba(255,255,255,0.3); cursor: pointer; font-size: 11px; padding: 2px; }
+.dp-close:hover { color: #fff; }
+#dl-status { padding: 10px 14px; font-size: 12px; color: rgba(255,255,255,0.55); line-height: 1.5; }
+#dl-progress-wrap { padding: 0 14px 4px; display: none; }
+#dl-progress-track { height: 3px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; }
+#dl-progress-fill { height: 100%; background: var(--accent); border-radius: 3px; width: 0; transition: width 0.2s; }
+#dl-btn { display: block; margin: 10px 14px 14px; padding: 9px 0; background: var(--accent); border: none;
+  border-radius: 8px; color: #fff; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+  cursor: pointer; width: calc(100% - 28px); transition: background 0.14s; text-align: center; }
+#dl-btn:hover { background: #6a5bef; }
+#dl-btn:disabled { background: rgba(124,106,255,0.3); cursor: not-allowed; }
+
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="player-area">
+    <iframe id="iframe" allow="autoplay; fullscreen"></iframe>
+    <video id="native-video" autoplay playsinline></video>
+
+    <div id="subtitle-overlay">
+      <span id="subtitle-text"></span>
+    </div>
+
+    <div id="ctrl-wrap">
+      <div id="center-controls" style="display:none"></div>
+
+      <div id="ctrl-bar">
+        <div id="now-playing">
+          <img id="np-poster" src="" alt="" onerror="this.style.display='none'" style="display:none">
+          <div id="np-text">
+            <div id="np-title">—</div>
+            <div id="np-sub"></div>
+          </div>
+        </div>
+
+        <div id="ctrl-progress">
+          <div id="prog-buf"></div>
+          <div id="prog-fill"></div>
+          <div id="prog-thumb"></div>
+          <div id="prog-tooltip"></div>
+        </div>
+
+        <div id="ctrl-row">
+          <div id="ctrl-left">
+            <button class="cbtn" id="cbtn-play-bar">
+              <svg id="icon-play-bar" width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M5 3.5L14.5 9 5 14.5V3.5z" fill="currentColor"/></svg>
+              <svg id="icon-pause-bar" width="18" height="18" viewBox="0 0 18 18" fill="none" style="display:none"><rect x="4" y="3" width="3.5" height="12" rx="1.8" fill="currentColor"/><rect x="10.5" y="3" width="3.5" height="12" rx="1.8" fill="currentColor"/></svg>
+            </button>
+            <div id="vol-wrap">
+              <button class="cbtn" id="cbtn-mute">
+                <svg id="icon-vol" width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M3 6.5H6L10 3.5v10L6 10.5H3V6.5z" fill="currentColor"/><path d="M12 5.5c1 .9 1.7 2.2 1.7 3.5s-.7 2.6-1.7 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                <svg id="icon-muted" width="17" height="17" viewBox="0 0 17 17" fill="none" style="display:none"><path d="M3 6.5H6L10 3.5v10L6 10.5H3V6.5z" fill="currentColor"/><path d="M13 6L15.5 8.5M15.5 6L13 8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              </button>
+              <div id="vol-track-wrap">
+                <div id="vol-track">
+                  <div id="vol-fill"></div>
+                  <input id="vol-range" type="range" min="0" max="1" step="0.01" value="1">
+                </div>
+              </div>
+            </div>
+            <div id="ctrl-time">
+              <span id="t-cur">0:00</span>
+              <span id="t-sep">/</span>
+              <span id="t-dur">0:00</span>
+            </div>
+            <div id="pp-logo" style="display:flex;align-items:center;padding:0 6px;opacity:0.85;pointer-events:none;">
+              <svg height="16" viewBox="0 0 130 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs><linearGradient id="ppg" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#9b8fff"/><stop offset="100%" stop-color="#6a5fff"/></linearGradient></defs>
+                <text x="0" y="21" font-family="DM Sans,sans-serif" font-weight="700" font-size="22" fill="#ffffff">Peak</text>
+                <text x="54" y="21" font-family="DM Sans,sans-serif" font-weight="700" font-size="22" fill="url(#ppg)">Player</text>
+              </svg>
+            </div>
+          </div>
+
+          <div id="ctrl-right">
+            <div id="tv-ctrl" style="display:none; align-items:center; gap:4px;">
+              <label class="ctrl-lbl">S</label><input id="s-in" class="ctrl-inp" type="number" min="1" value="1">
+              <label class="ctrl-lbl">E</label><input id="e-in" class="ctrl-inp" type="number" min="1" value="1">
+              <button class="cbtn cbtn-go" id="tv-go">Go</button>
+            </div>
+
+            <button class="cbtn cbtn-icon" id="cbtn-dl" title="Download">
+              <svg width="15" height="16" viewBox="0 0 15 16" fill="none">
+                <path d="M7.5 1v9M4 7l3.5 3.5L11 7" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M1.5 12.5v1a1 1 0 001 1h10a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/>
+              </svg>
+            </button>
+            <button class="cbtn cbtn-icon" id="cbtn-cc" title="Captions">
+              <svg width="20" height="14" viewBox="0 0 20 14" fill="none">
+                <rect x="0.75" y="0.75" width="18.5" height="12.5" rx="2.25" stroke="currentColor" stroke-width="1.3"/>
+                <text x="10" y="10" font-size="7" font-weight="700" fill="currentColor" font-family="sans-serif" text-anchor="middle" letter-spacing="0.5">CC</text>
+              </svg>
+            </button>
+            <button class="cbtn cbtn-icon" id="cbtn-quality" title="Quality">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="11" width="2" height="3.5" rx="1" fill="currentColor" opacity=".3"/><rect x="4.2" y="8.5" width="2" height="6" rx="1" fill="currentColor" opacity=".55"/><rect x="7.4" y="5.5" width="2" height="9" rx="1" fill="currentColor" opacity=".8"/><rect x="10.6" y="2.5" width="2" height="12" rx="1" fill="currentColor"/></svg>
+            </button>
+
+            <button class="cbtn cbtn-icon" id="cbtn-fs">
+              <svg id="icon-expand" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1.5 5V1.5H5M9 1.5h3.5V5M12.5 9v3.5H9M5 12.5H1.5V9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg id="icon-shrink" width="14" height="14" viewBox="0 0 14 14" fill="none" style="display:none"><path d="M5 1.5V5H1.5M12.5 5H9V1.5M9 12.5V9h3.5M1.5 9H5v3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="quality-panel">
+      <div class="qp-head">Quality <button class="qp-close" id="qp-close">✕</button></div>
+      <div id="quality-list"></div>
+    </div>
+
+    <div id="caption-panel">
+      <div class="cp-head">Captions <button class="cp-close" id="cp-close">✕</button></div>
+      <div id="caption-status">Searching…</div>
+      <div id="caption-list"></div>
+    </div>
+
+    <div id="download-panel">
+      <div class="dp-head">Download <button class="dp-close" id="dp-close">✕</button></div>
+      <div id="dl-status">Downloads the full movie losslessly by stitching all HLS segments.</div>
+      <div id="dl-progress-wrap">
+        <div id="dl-progress-track"><div id="dl-progress-fill"></div></div>
+      </div>
+      <button id="dl-btn">Download Movie/Show</button>
+    </div>
+
+    <div id="seek-left"  class="seek-flash left"  style="display:none"></div>
+    <div id="seek-right" class="seek-flash right" style="display:none"></div>
+
+    <div id="loader">
+      <div class="spinner"></div>
+      <div id="loader-title">Loading stream…</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.7/hls.min.js"></script>
+<script>
+const PEAK_SETTINGS_KEY = 'nova_settings_v1';
+const PROXY = '';
+const p     = new URLSearchParams(location.search);
+const tmdb  = p.get('tmdb') || p.get('id') || null;
+const type  = p.get('type') || 'movie';
+const isTV  = type === 'tv';
+let season  = parseInt(p.get('s') || p.get('season') || '1');
+let episode = parseInt(p.get('e') || p.get('episode') || '1');
+
+
+if (!tmdb) {
+  document.getElementById('loader').innerHTML = `
+    <div style="text-align:center;color:rgba(255,255,255,0.4);font-family:'DM Sans',sans-serif">
+      <div style="font-size:14px;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:6px">No TMDB ID</div>
+      <div style="font-size:12px">Use ?tmdb=12345&amp;type=movie or ?tmdb=12345&amp;type=tv&amp;s=1&amp;e=1</div>
+    </div>`;
+  throw new Error('No TMDB ID');
+}
+
+const subtitleState = {
+  cues: [],
+  active: false,
+  currentSub: null,
+  activeUrl: null
+};
+
+function parseSRT(srt) {
+  const cues = [];
+  const blocks = srt.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split(/\n\n+/);
+  for (const block of blocks) {
+    const lines = block.trim().split('\n');
+    let ti = 0;
+    if (lines[ti] && /^\d+$/.test(lines[ti].trim())) ti++;
+    if (!lines[ti]) continue;
+    const timeLine = lines[ti];
+    const tm = timeLine.match(/(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)/);
+    if (!tm) continue;
+    const start = +tm[1]*3600 + +tm[2]*60 + +tm[3] + +tm[4]/1000;
+    const end   = +tm[5]*3600 + +tm[6]*60 + +tm[7] + +tm[8]/1000;
+    const text  = lines.slice(ti+1).join('\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\{[^}]+\}/g, '')
+      .trim();
+    if (text) cues.push({ start, end, text });
+  }
+  return cues;
+}
+
+function parseVTT(vtt) {
+  const stripped = vtt.replace(/^WEBVTT[^\n]*\n/, '').replace(/NOTE[^\n]*\n[^\n]*\n/g, '');
+  return parseSRT(stripped);
+}
+
+function tickSubtitles(currentTime) {
+  if (!subtitleState.active || !subtitleState.cues.length) {
+    hideSubtitle(); return;
+  }
+  const cue = subtitleState.cues.find(c => currentTime >= c.start && currentTime <= c.end);
+  if (cue) {
+    if (subtitleState.currentSub !== cue.text) {
+      subtitleState.currentSub = cue.text;
+      showSubtitle(cue.text);
+    }
+  } else {
+    subtitleState.currentSub = null;
+    hideSubtitle();
+  }
+}
+
+const subText = document.getElementById('subtitle-text');
+function showSubtitle(text) { subText.textContent = text; subText.classList.add('visible'); }
+function hideSubtitle() { subText.classList.remove('visible'); }
+
+let streamSubtitles = [];
+
+function buildCaptionPanel() {
+  const capStatus = document.getElementById('caption-status');
+  const capList   = document.getElementById('caption-list');
+  capList.innerHTML = '';
+
+  if (!streamSubtitles.length) {
+    capStatus.textContent = 'No subtitles available';
+    return;
+  }
+
+  capStatus.textContent = `${streamSubtitles.length} track${streamSubtitles.length !== 1 ? 's' : ''} available`;
+
+  const off = document.createElement('div');
+  off.className = 'cap-item cap-off' + (!subtitleState.active ? ' active' : '');
+  off.textContent = 'Off';
+  off.onclick = () => {
+    subtitleState.active = false;
+    subtitleState.cues = [];
+    subtitleState.activeUrl = null;
+    hideSubtitle();
+    document.getElementById('cbtn-cc').classList.remove('cc-active');
+    buildCaptionPanel();
+  };
+  capList.appendChild(off);
+
+  streamSubtitles.forEach(sub => {
+    const el = document.createElement('div');
+    el.className = 'cap-item' + (sub.url === subtitleState.activeUrl ? ' active' : '');
+    el.textContent = sub.label;
+    el.onclick = () => loadVttSubtitle(sub.url);
+    capList.appendChild(el);
+  });
+}
+
+async function loadVttSubtitle(url) {
+  const capStatus = document.getElementById('caption-status');
+  capStatus.textContent = 'Loading…';
+  subtitleState.activeUrl = url;
+  buildCaptionPanel();
+
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const text = await r.text();
+    const cues = text.trim().startsWith('WEBVTT') ? parseVTT(text) : parseSRT(text);
+    if (!cues.length) throw new Error('No cues parsed');
+    subtitleState.cues   = cues;
+    subtitleState.active = true;
+    capStatus.textContent = `${cues.length} cues loaded`;
+    document.getElementById('cbtn-cc').classList.add('cc-active');
+    buildCaptionPanel();
+  } catch (e) {
+    capStatus.textContent = 'Failed to load';
+    subtitleState.activeUrl = null;
+    console.error('Subtitle load error:', e);
+  }
+}
+
+const capPanel = document.getElementById('caption-panel');
+const btnCC    = document.getElementById('cbtn-cc');
+const cpClose  = document.getElementById('cp-close');
+
+function openCaptionPanel() {
+  if (typeof closeQuality === 'function') closeQuality();
+  capPanel.style.display = 'block';
+  requestAnimationFrame(() => capPanel.classList.add('open'));
+  buildCaptionPanel();
+}
+function closeCaptionPanel() { capPanel.classList.remove('open'); }
+
+btnCC.addEventListener('click', e => { e.stopPropagation(); openCaptionPanel(); });
+cpClose.addEventListener('click', closeCaptionPanel);
+document.addEventListener('click', e => {
+  if (!capPanel.contains(e.target) && e.target !== btnCC) closeCaptionPanel();
+});
+
+let peakMp4Qualities = [];
+let peakProxyFallbackUrl = null;
+let peakTriedProxyFallback = false;
+let recovering = false;
+let hlsInstance = null;
+
+function peakProxyInnerUrl(u) {
+  try {
+    const m = /[?&]url=([^&]+)/.exec(String(u));
+    return m ? decodeURIComponent(m[1]) : u;
+  } catch {
+    return u;
+  }
+}
+
+
+const iframe      = document.getElementById('iframe');
+const nativeVideo = document.getElementById('native-video');
+const loader      = document.getElementById('loader');
+
+async function resolveStream(t, id, s, e) {
+  const base = PROXY.replace(/\/$/, '');
+  const endpoint = t === 'tv'
+    ? `${base}/resolve/tv/${id}/${s || 1}/${e || 1}`
+    : `${base}/resolve/movie/${id}`;
+  const res = await fetch(endpoint);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error || !data.url) {
+    const msg = data.error || (!res.ok ? 'HTTP ' + res.status : '') || 'No stream found';
+    throw new Error(msg);
+  }
+  const proxiedUrl = `${base}/proxy?url=${encodeURIComponent(data.url)}`;
+  const qualities = Array.isArray(data.sources) && data.sources.length > 1
+    ? data.sources.filter(src => src.type === 'hls' && src.url).map(src => ({
+        label: src.title || 'Source',
+        url: `${base}/proxy?url=${encodeURIComponent(src.url)}`
+      }))
+    : [];
+  const subtitles = (data.subtitles || []).map(s => ({
+    label: s.label,
+    url: `${base}/subtitle?url=${encodeURIComponent(s.url)}`
+  }));
+  return { url: proxiedUrl, qualities, subtitles, proxyFallbackUrl: null };
+}
+const unmuteBtn = (() => {
+  const btn = document.createElement('button');
+  btn.id = 'unmute-btn';
+  btn.textContent = 'Click to unmute';
+  Object.assign(btn.style, {
+    position: 'absolute', top: '18px', right: '18px', zIndex: '50',
+    background: 'rgba(0,0,0,0.72)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)',
+    borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: '600',
+    cursor: 'pointer', display: 'none',
+    fontFamily: "'DM Sans', sans-serif"
+  });
+  document.getElementById('player-area').appendChild(btn);
+  return btn;
+})();
+
+function setupUnmute(v) {
+  unmuteBtn.style.display = 'none';
+  v.muted = true;
+  v.play().then(() => {
+    v.muted = false;
+    if (v.muted) {
+      unmuteBtn.style.display = '';
+    }
+  }).catch(() => {
+    unmuteBtn.style.display = '';
+  });
+  unmuteBtn.onclick = () => {
+    v.muted = false;
+    v.play().catch(() => {});
+    unmuteBtn.style.display = 'none';
+  };
+  v.addEventListener('volumechange', () => {
+    if (!v.muted && v.volume > 0) unmuteBtn.style.display = 'none';
+  });
+}
+
+function showNative(url) {
+  iframe.src = '';
+  iframe.style.display = 'none';
+  nativeVideo.classList.add('active');
+  if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+  nativeVideo.referrerPolicy = '';
+
+  function playbackUrlLooksLikeMp4(u) {
+    const s = String(u);
+    if (/\.m3u8/i.test(s)) return false;
+    if (/workers\.dev\/https/i.test(s)) return true;
+    try {
+      const m = /[?&]url=([^&]+)/i.exec(s);
+      if (m) {
+        const d = decodeURIComponent(m[1]);
+        return /\.mp4/i.test(d) && !/\.m3u8/i.test(d);
+      }
+    } catch (e) {}
+    if (/\.mp4/i.test(s)) return true;
+    return /type=video\/mp4|format=mp4/i.test(s);
+  }
+  if (playbackUrlLooksLikeMp4(url)) {
+    window._hlsInstance = null;
+    if (/workers\.dev/i.test(url)) nativeVideo.referrerPolicy = 'unsafe-url';
+    else nativeVideo.referrerPolicy = '';
+    const onMp4Err = () => {
+      nativeVideo.removeEventListener('error', onMp4Err);
+      if (peakTriedProxyFallback || !peakProxyFallbackUrl) return;
+      peakTriedProxyFallback = true;
+      peakMp4Qualities = [];
+      nativeVideo.referrerPolicy = '';
+      nativeVideo.src = peakProxyFallbackUrl;
+      peakProxyFallbackUrl = null;
+      nativeVideo.play().catch(() => {});
+    };
+    nativeVideo.addEventListener('error', onMp4Err);
+    nativeVideo.src = url;
+    nativeVideo.play().catch(() => {});
+    loader.classList.add('gone');
+    setupUnmute(nativeVideo);
+    if (window._showControls) window._showControls();
+    return;
+  }
+
+  if (Hls.isSupported()) {
+    hlsInstance = new Hls({
+      enableWorker: true,
+      startLevel: -1,
+      capLevelToPlayerSize: false,
+      maxBufferLength: 60, maxMaxBufferLength: 120, maxBufferSize: 60 * 1000 * 1000,
+      maxBufferHole: 0.5, highBufferWatchdogPeriod: 2, nudgeMaxRetry: 5,
+      fragLoadingTimeOut: 20000, fragLoadingMaxRetry: 6, fragLoadingRetryDelay: 500,
+      manifestLoadingTimeOut: 15000, manifestLoadingMaxRetry: 4,
+      levelLoadingTimeOut: 15000, levelLoadingMaxRetry: 4,
+      abrEwmaDefaultEstimate: 8000000,
+    });
+    window._hlsInstance = hlsInstance;
+    hlsInstance.loadSource(url);
+    hlsInstance.attachMedia(nativeVideo);
+    hlsInstance.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
+      // Always force highest quality level
+      hlsInstance.currentLevel = data.levels.length - 1;
+      if (hlsInstance.audioTracks.length > 0 && hlsInstance.audioTrack < 0) {
+        hlsInstance.audioTrack = 0;
+      }
+      loader.classList.add('gone');
+      setupUnmute(nativeVideo);
+      if (window._showControls) window._showControls();
+    });
+    hlsInstance.on(Hls.Events.ERROR, async (_, d) => {
+      if (d.fatal && d.type === Hls.ErrorTypes.NETWORK_ERROR && !recovering) {
+        recovering = true;
+        hlsInstance.destroy(); hlsInstance = null;
+        try {
+          const d = await resolveStream(type, tmdb, season, episode);
+          streamSubtitles = d.subtitles || [];
+          peakProxyFallbackUrl = d.proxyFallbackUrl || null;
+          peakTriedProxyFallback = false;
+          peakMp4Qualities = Array.isArray(d.qualities) && d.qualities.length ? d.qualities : [];
+          showNative(d.url);
+        } catch {}
+        setTimeout(() => { recovering = false; }, 10000);
+      }
+    });
+  } else {
+    nativeVideo.src = url;
+    nativeVideo.play().catch(() => {});
+    loader.classList.add('gone');
+  }
+}
+
+function showStreamFailure(err) {
+  loader.classList.remove('gone');
+  loader.innerHTML = `
+    <div style="text-align:center;max-width:400px;padding:24px 20px;font-family:'DM Sans',sans-serif">
+      <div style="font-size:15px;font-weight:600;color:rgba(255,255,255,0.88);margin-bottom:10px">Could not load video</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.42);line-height:1.55">${err.message || 'Unknown error'}</div>
+    </div>`;
+}
+
+async function load() {
+  loader.classList.remove('gone');
+  loader.innerHTML = '<div class="spinner"></div><div id="loader-title">Loading stream…</div>';
+  subtitleState.active = false; subtitleState.cues = []; subtitleState.activeUrl = null;
+  streamSubtitles = []; hideSubtitle();
+  capPanel.classList.remove('open');
+  document.getElementById('cbtn-cc').classList.remove('cc-active');
+  peakProxyFallbackUrl = null;
+  peakTriedProxyFallback = false;
+  try {
+    const data = await resolveStream(type, tmdb, season, episode);
+    streamSubtitles = data.subtitles || [];
+    peakProxyFallbackUrl = data.proxyFallbackUrl || null;
+    peakMp4Qualities = Array.isArray(data.qualities) && data.qualities.length ? data.qualities : [];
+    showNative(data.url);
+  } catch (err) {
+    peakMp4Qualities = [];
+    showStreamFailure(err);
+  }
+}
+
+if (isTV) {
+  const tvCtrl = document.getElementById('tv-ctrl');
+  if (tvCtrl) tvCtrl.style.display = 'flex';
+  document.getElementById('s-in').value = season;
+  document.getElementById('e-in').value = episode;
+  document.getElementById('tv-go').onclick = () => {
+    season  = parseInt(document.getElementById('s-in').value) || 1;
+    episode = parseInt(document.getElementById('e-in').value) || 1;
+    load();
+  };
+}
+
+const TMDB_KEY = 'd0e624ba15ac711e6d672c909b2d0f69';
+async function loadMeta() {
+  try {
+    const ep = isTV ? `https://api.themoviedb.org/3/tv/${tmdb}?api_key=${TMDB_KEY}` : `https://api.themoviedb.org/3/movie/${tmdb}?api_key=${TMDB_KEY}`;
+    const d = await (await fetch(ep)).json();
+    const title   = d.title || d.name || '#' + tmdb;
+    const tagline = d.tagline || (isTV ? d.first_air_date?.slice(0,4) : d.release_date?.slice(0,4)) || '';
+    document.title = title;
+    document.getElementById('np-title').textContent = title;
+    document.getElementById('np-sub').textContent = tagline;
+    if (d.poster_path) {
+      const img = document.getElementById('np-poster');
+      img.src = 'https://image.tmdb.org/t/p/w92' + d.poster_path;
+      img.style.display = '';
+    }
+  } catch { document.getElementById('np-title').textContent = '#' + tmdb; }
+}
+
+loadMeta();
+load();
+
+// ── Download ──────────────────────────────────────────────────────────────────
+(function(){
+  const dlPanel    = document.getElementById('download-panel');
+  const dlBtn      = document.getElementById('dl-btn');
+  const dlStatus   = document.getElementById('dl-status');
+  const dlProgWrap = document.getElementById('dl-progress-wrap');
+  const dlProgFill = document.getElementById('dl-progress-fill');
+  const dpClose    = document.getElementById('dp-close');
+  const btnDl      = document.getElementById('cbtn-dl');
+
+  function openDlPanel() {
+    if (typeof closeCaptionPanel === 'function') closeCaptionPanel();
+    if (typeof closeQuality === 'function') closeQuality();
+    dlPanel.style.display = 'block';
+    requestAnimationFrame(() => dlPanel.classList.add('open'));
+  }
+  function closeDlPanel() { dlPanel.classList.remove('open'); }
+
+  btnDl.addEventListener('click', e => { e.stopPropagation(); openDlPanel(); });
+  dpClose.addEventListener('click', closeDlPanel);
+  document.addEventListener('click', e => {
+    if (!dlPanel.contains(e.target) && e.target !== btnDl) closeDlPanel();
+  });
+
+  function getTitle() {
+    return (document.getElementById('np-title')?.textContent || 'video')
+      .replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') || 'video';
+  }
+
+  function getCurrentStreamUrl() {
+    const hls = window._hlsInstance;
+    if (hls && hls.url) {
+      const u = hls.url;
+      try {
+        const m = /[?&]url=([^&]+)/.exec(u);
+        if (m) return decodeURIComponent(m[1]);
+      } catch(e) {}
+      return u;
+    }
+    return nativeVideo.src || null;
+  }
+
+  dlBtn.addEventListener('click', () => {
+    const streamUrl = getCurrentStreamUrl();
+    if (!streamUrl) { dlStatus.textContent = 'No stream loaded yet.'; return; }
+
+    const title = getTitle();
+    const downloadUrl = '/download?url=' + encodeURIComponent(streamUrl) + '&title=' + encodeURIComponent(title);
+
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = title + '.ts';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    dlStatus.textContent = 'Download started — check your browser downloads.';
+  });
+})();
+
+// ── Controls ─────────────────────────────────────────────────────────────────
+(function(){
+  const v            = nativeVideo;
+  const wrap         = document.getElementById('ctrl-wrap');
+  const progTrack    = document.getElementById('ctrl-progress');
+  const progFill     = document.getElementById('prog-fill');
+  const progBuf      = document.getElementById('prog-buf');
+  const progThumb    = document.getElementById('prog-thumb');
+  const iconPlayBar  = document.getElementById('icon-play-bar');
+  const iconPauseBar = document.getElementById('icon-pause-bar');
+  const btnPlayBar   = document.getElementById('cbtn-play-bar');
+  const btnMute      = document.getElementById('cbtn-mute');
+  const iconVol      = document.getElementById('icon-vol');
+  const iconMuted    = document.getElementById('icon-muted');
+  const volRange     = document.getElementById('vol-range');
+  const volFill      = document.getElementById('vol-fill');
+  const tCur         = document.getElementById('t-cur');
+  const tDur         = document.getElementById('t-dur');
+  const btnFS        = document.getElementById('cbtn-fs');
+  const iconExpand   = document.getElementById('icon-expand');
+  const iconShrink   = document.getElementById('icon-shrink');
+  const btnQuality   = document.getElementById('cbtn-quality');
+  const qualPanel    = document.getElementById('quality-panel');
+  const qualList     = document.getElementById('quality-list');
+  const qpClose      = document.getElementById('qp-close');
+
+  function fmt(s) {
+    if (!s || isNaN(s)) return '0:00';
+    const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = Math.floor(s%60);
+    return h > 0 ? h+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0') : m+':'+String(sec).padStart(2,'0');
+  }
+
+  function syncPlay() {
+    const paused = v.paused;
+    iconPlayBar.style.display  = paused ? '' : 'none';
+    iconPauseBar.style.display = paused ? 'none' : '';
+    wrap.classList.toggle('paused', paused);
+  }
+
+  function syncVol() {
+    const m = v.muted || v.volume === 0;
+    iconVol.style.display   = m ? 'none' : '';
+    iconMuted.style.display = m ? '' : 'none';
+    volFill.style.width = ((m ? 0 : v.volume) * 100) + '%';
+    volRange.value = v.volume;
+  }
+
+  function syncProg() {
+    if (!v.duration) return;
+    const pct = (v.currentTime / v.duration) * 100;
+    progFill.style.width = pct + '%';
+    progThumb.style.left = pct + '%';
+    tCur.textContent = fmt(v.currentTime);
+    tDur.textContent = fmt(v.duration);
+    if (v.buffered.length) progBuf.style.width = (v.buffered.end(v.buffered.length-1) / v.duration * 100) + '%';
+    // Tick subtitles on every timeupdate
+    tickSubtitles(v.currentTime);
+  }
+
+  v.addEventListener('play', () => { syncPlay(); showControls(); });
+  v.addEventListener('pause', () => { syncPlay(); showControls(); });
+  v.addEventListener('timeupdate', syncProg);
+  v.addEventListener('volumechange', syncVol);
+  v.addEventListener('loadedmetadata', () => { tDur.textContent = fmt(v.duration); });
+
+  function togglePlay() { v.paused ? v.play() : v.pause(); }
+  btnPlayBar.addEventListener('click', togglePlay);
+  btnMute.addEventListener('click', () => { v.muted = !v.muted; syncVol(); });
+  volRange.addEventListener('input', () => { v.volume = parseFloat(volRange.value); v.muted = v.volume === 0; syncVol(); });
+
+  window.skip = function(d) { v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + d)); };
+
+  let seeking = false;
+  const progTooltip = document.getElementById('prog-tooltip');
+  progTrack.addEventListener('mousemove', e => {
+    const rect = progTrack.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const t = pct * (v.duration || 0);
+    progTooltip.textContent = fmt(t);
+    progTooltip.style.left = (pct * 100) + '%';
+  });
+  progTrack.addEventListener('mousedown', e => { seeking = true; v.currentTime = Math.max(0, Math.min(1, (e.clientX - progTrack.getBoundingClientRect().left) / progTrack.offsetWidth)) * (v.duration || 0); });
+  document.addEventListener('mousemove', e => { if (seeking) v.currentTime = Math.max(0, Math.min(1, (e.clientX - progTrack.getBoundingClientRect().left) / progTrack.offsetWidth)) * (v.duration || 0); });
+  document.addEventListener('mouseup', () => seeking = false);
+
+  function showFlash(el, label) {
+    el.style.display = 'flex'; el.textContent = label;
+    el.style.animation = 'none'; el.offsetHeight;
+    el.style.animation = 'flash-out 0.5s forwards';
+    setTimeout(() => { el.style.display = 'none'; el.style.animation = 'none'; }, 500);
+  }
+
+  let tapT = null;
+  document.getElementById('player-area').addEventListener('click', e => {
+    if (!v.classList.contains('active')) return;
+    if (e.target.closest('.cbtn,.cc-btn,#ctrl-bar,#caption-panel')) return;
+    if (tapT) {
+      clearTimeout(tapT); tapT = null;
+      const left = e.clientX < window.innerWidth / 2;
+      skip(left ? -10 : 10);
+      showFlash(document.getElementById(left ? 'seek-left' : 'seek-right'), (left ? '-' : '+') + '10s');
+    } else {
+      tapT = setTimeout(() => { tapT = null; togglePlay(); }, 200);
+    }
+  });
+
+  btnFS.addEventListener('click', () => {
+    document.fullscreenElement ? document.exitFullscreen() : document.getElementById('player-area').requestFullscreen?.();
+  });
+  document.addEventListener('fullscreenchange', () => {
+    const fs = !!document.fullscreenElement;
+    iconExpand.style.display = fs ? 'none' : '';
+    iconShrink.style.display = fs ? '' : 'none';
+    if (window._hlsInstance) {
+      setTimeout(() => {
+        const h = window._hlsInstance;
+        if (h) { const cap = h.autoLevelCapping; h.autoLevelCapping = -1; h.autoLevelCapping = cap; }
+      }, 200);
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeCaptionPanel(); closeQuality(); }
+    if (!v.classList.contains('active')) return;
+    if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+    if (e.key === ' ' || e.key === 'k') { e.preventDefault(); togglePlay(); }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); skip(-5); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); skip(5); }
+    if (e.key === 'ArrowUp')    { e.preventDefault(); v.volume = Math.min(1, v.volume + 0.1); syncVol(); }
+    if (e.key === 'ArrowDown')  { e.preventDefault(); v.volume = Math.max(0, v.volume - 0.1); syncVol(); }
+    if (e.key === 'm') { v.muted = !v.muted; syncVol(); }
+    if (e.key === 'f') { btnFS.click(); }
+    if (e.key === 'c') { openCaptionPanel(); }
+  });
+
+  function buildQuality() {
+    const hls = window._hlsInstance;
+    qualList.innerHTML = '';
+    if (!hls) {
+      const one = document.createElement('div');
+      one.className = 'qp-item active';
+      one.textContent = 'Source';
+      qualList.appendChild(one);
+      return;
+    }
+    hls.levels.forEach((lvl, i) => {
+      const d = document.createElement('div');
+      const lbl = lvl.height ? lvl.height + 'p' : 'Level ' + (i + 1);
+      const badge = lvl.bitrate ? Math.round(lvl.bitrate / 1000) + 'k' : '';
+      d.className = 'qp-item' + (hls.currentLevel === i ? ' active' : '');
+      d.innerHTML = lbl + (badge ? ` <span class="qp-badge">${badge}</span>` : '');
+      d.onclick = () => { hls.currentLevel = i; closeQuality(); };
+      qualList.appendChild(d);
+    });
+  }
+  function closeQuality() { qualPanel.classList.remove('open'); }
+  btnQuality.addEventListener('click', e => {
+    e.stopPropagation();
+    closeCaptionPanel();
+    qualPanel.style.display = 'block';
+    buildQuality();
+    requestAnimationFrame(() => qualPanel.classList.toggle('open'));
+  });
+  qpClose.addEventListener('click', closeQuality);
+  document.addEventListener('click', e => { if (!qualPanel.contains(e.target) && e.target !== btnQuality) closeQuality(); });
+
+  syncPlay(); syncVol();
+
+  const ctrlBar = document.getElementById('ctrl-bar');
+  const playerArea = document.getElementById('player-area');
+  let hideTimer = null;
+  let mouseOverBar = false;
+  let mouseInPlayer = playerArea.matches(':hover');
+
+  function hideControls() {
+    if (!v.paused) {
+      ctrlBar.classList.remove('controls-visible');
+      playerArea.style.cursor = 'none';
+    }
+  }
+
+  function showControls() {
+    if (!mouseInPlayer) return;
+    ctrlBar.classList.add('controls-visible');
+    playerArea.style.cursor = '';
+    clearTimeout(hideTimer);
+    if (!mouseOverBar) {
+      hideTimer = setTimeout(hideControls, 4000);
+    }
+  }
+
+  ctrlBar.addEventListener('mouseenter', () => { mouseOverBar = true; clearTimeout(hideTimer); showControls(); });
+  ctrlBar.addEventListener('mouseleave', () => { mouseOverBar = false; showControls(); });
+  playerArea.addEventListener('mousemove', showControls);
+  playerArea.addEventListener('mouseenter', () => { mouseInPlayer = true; showControls(); });
+  playerArea.addEventListener('mouseleave', () => { mouseInPlayer = false; clearTimeout(hideTimer); hideControls(); });
+  v.addEventListener('canplay', () => { mouseInPlayer = playerArea.matches(':hover'); showControls(); });
+  window._showControls = () => { mouseInPlayer = playerArea.matches(':hover'); showControls(); };
+  showControls();
+})();
+</script>
+</body>
+</html>
